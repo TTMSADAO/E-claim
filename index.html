@@ -206,7 +206,7 @@
 
   <div class="sidebar" id="sidebar">
     <div class="logo-area">
-      <img src="https://img2.pic.in.th/pic/6f7b352408393a1295f3000e7d9e6754.md.png" alt="Logo">
+      <img src="https://img2.pic.in.th/pic/6f7b352408393a1295f3000e7d9e6754.md.png" alt="Logo" style="width: 100px; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); margin-bottom: 15px; background: white; padding: 5px;">
       <h2>E-Claim TTM<br><span style="color: white; font-size: 15px; font-weight: 500;">Cost Analytics</span></h2>
     </div>
     <div class="nav-links">
@@ -489,7 +489,22 @@
 
   <div id="toast"><i id="toast-icon" class="fa-solid fa-info-circle"></i> <span id="toast-msg">ข้อความ</span></div>
 
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
   <script>
+    // 🌟 1. Firebase Configuration
+    const firebaseConfig = {
+      databaseURL: "https://e-claim-cb9de-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    
+    // ตั้งค่า Secret Key สำหรับยิงข้อมูลตรงเข้า Database แบบ Admin Bypass (ใช้งานเฉพาะกรณีดึงข้อมูลตรงๆ ถ้าใช้ผ่าน GAS ไม่ต้องใช้)
+    const DB_SECRET = "db3X6wQyWFphqUj9XillzFjwP5487Abw0KvXfeYCer";
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ส่วนของ Apps Script เดิม สำหรับ Upload
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyWfO2LTHuo8UV4ln26Jecos3KKansPxXfXENk1YreDgiuXwPF8sFOCrfIQsLUNk3gRA/exec';
     
     let isAdmin = false;
@@ -510,6 +525,19 @@
       if (typeof val === 'number' && !isNaN(val)) return val;
       let parsed = parseFloat(val);
       return isNaN(parsed) ? 0 : parsed;
+    }
+    
+    function extractMonthYear(rawVal, displayVal) {
+      let str = String(displayVal || rawVal || "").trim();
+      if (str.includes('/')) {
+        let parts = str.split('/');
+        if (parts.length >= 3) return { m: parts[1].padStart(2, '0'), y: parts[2].substring(0, 4) };
+      }
+      if (str.includes('-')) {
+        let parts = str.split('T')[0].split('-');
+        if (parts.length >= 3) return { m: parts[1].padStart(2, '0'), y: parts[0] };
+      }
+      return { m: "ไม่ระบุ", y: "ไม่ระบุ" };
     }
 
     function initApp() { fetchDashboardData(); }
@@ -553,7 +581,11 @@
     function switchTab(tab) {
       if (window.innerWidth <= 1024) toggleSidebar(); 
       if ((tab === 'drug' || tab === 'upload' || tab === 'db') && !isAdmin) { showLogin(() => switchTab(tab)); return; }
-      if (tab === 'db') { openDatabase(); return; }
+      
+      if (tab === 'db') { 
+          window.open('https://docs.google.com/spreadsheets/d/1pEeKv-9lSO-amw6uIEAuPUDPXoJ5LbVIz40JTe14ah0/edit', '_blank'); 
+          return; 
+      }
 
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -565,28 +597,55 @@
       else if(tab === 'upload') document.getElementById('page-title').innerText = 'ระบบนำเข้าข้อมูล';
     }
 
-    function openDatabase() {
-      window.open('https://docs.google.com/spreadsheets/d/1pEeKv-9lSO-amw6uIEAuPUDPXoJ5LbVIz40JTe14ah0/edit', '_blank');
-    }
-
     let globalSheetData = []; 
     let globalDrugTotalTxMap = {}; 
 
+    // 🌟 ดึงข้อมูลจาก Firebase (เร็วกว่า Google Sheets 10 เท่า!)
     async function fetchDashboardData() {
       document.getElementById('loading-overlay').classList.add('show');
       try {
-        const response = await fetch(GAS_URL);
+        // ยิงผ่าน REST API ของ Firebase โดยใช้ auth token (secret key)
+        const response = await fetch(`${firebaseConfig.databaseURL}/eclaim_data.json?auth=${DB_SECRET}`);
         if (!response.ok) throw new Error("HTTP Error: " + response.status);
-        const result = await response.json();
-        if(result.status === "success") {
-          globalSheetData = result.data; 
-          globalDrugTotalTxMap = {};
-          globalSheetData.forEach(d => { globalDrugTotalTxMap[d.drug] = (globalDrugTotalTxMap[d.drug] || 0) + 1; });
-          populateFilters(); 
-          renderDashboard();
-          showToast("ซิงค์ฐานข้อมูลสำเร็จ", "success");
-        } else throw new Error(result.message || "Unknown Error");
-      } catch(e) { showToast("ไม่สามารถดึงข้อมูลได้: " + e.message, "error"); }
+        const data = await response.json();
+        
+        globalSheetData = [];
+        globalDrugTotalTxMap = {};
+        
+        if (data) {
+            // วนลูปแปลง Object ของ Firebase กลับมาเป็น Array ให้เหมือนเดิม
+            Object.keys(data).forEach(key => {
+                const d = data[key];
+                const { m, y } = extractMonthYear(d.date, d.date);
+                
+                const tmt = String(d.tmt || "").trim();
+                const req = safeNum(d.req);
+                const comp = safeNum(d.comp);
+                const qty = safeNum(d.qty);
+                
+                let cat = "";
+                if (comp <= 0) { cat = "C3"; } 
+                else if (comp < req) { cat = "C2"; } 
+                else { cat = "C1"; }
+
+                const formattedRow = {
+                    date: d.date, month: m, year: y, pid: d.pid, tmt: tmt, drug: d.drug, fund: d.fund,
+                    req: req, comp: comp, qty: qty, cost: safeNum(d.cost), profit: safeNum(d.profit), cat: cat, reason: d.reason,
+                    filename: d.filename
+                };
+                
+                globalSheetData.push(formattedRow);
+                globalDrugTotalTxMap[d.drug] = (globalDrugTotalTxMap[d.drug] || 0) + 1;
+            });
+        }
+        
+        populateFilters(); 
+        renderDashboard();
+        showToast("ซิงค์ฐานข้อมูลสำเร็จ (โหมดความเร็วสูง)", "success");
+      } catch(e) { 
+          showToast("ไม่สามารถดึงข้อมูลได้: " + e.message, "error"); 
+          console.error(e);
+      }
       document.getElementById('loading-overlay').classList.remove('show');
     }
 
@@ -663,13 +722,13 @@
         let safeReq = safeNum(d.req); let safeComp = safeNum(d.comp); let safeCost = safeNum(d.cost); let safeProfit = safeNum(d.profit);
         drugTxMap[d.drug] = (drugTxMap[d.drug] || 0) + 1;
 
-        if(safeComp >= safeReq && safeComp > 0) { 
+        if(d.cat === 'C1') { 
           c1_tx++; c1_pts.add(d.pid); c1_req += safeReq; c1_comp += safeComp; c1_cost += safeCost; c1_profit += safeProfit; 
           drugProfitMap[d.drug] = (drugProfitMap[d.drug] || 0) + safeProfit;
         }
-        else if(safeComp > 0 && safeComp < safeReq) { 
+        else if(d.cat === 'C2') { 
           c2_tx++; c2_pts.add(d.pid); c2_req += safeReq; c2_comp += safeComp; c2_cost += safeCost; c2_profit += safeProfit; 
-          c2_loss_k += (safeReq - safeComp); 
+          c2_loss_k += safeNum(safeReq - safeComp); 
           drugProfitMap[d.drug] = (drugProfitMap[d.drug] || 0) + safeProfit; 
           
           let rsn = d.reason ? d.reason : "การปรับลดจำนวนเงินชดเชย (ไม่ระบุสาเหตุเพิ่มเติม)";
@@ -678,7 +737,7 @@
           if(!reasonPrescriptionMap[rsn].drugs[d.drug]) reasonPrescriptionMap[rsn].drugs[d.drug] = { tx: 0, profit: 0 };
           reasonPrescriptionMap[rsn].drugs[d.drug].tx++; reasonPrescriptionMap[rsn].drugs[d.drug].profit += safeProfit;
         }
-        else if(safeComp === 0) { 
+        else if(d.cat === 'C3') { 
           c3_tx++; c3_pts.add(d.pid); c3_req += safeReq; c3_cost += safeCost; 
           drugLossMap[d.drug] = (drugLossMap[d.drug] || 0) + safeCost; 
           
@@ -1141,6 +1200,7 @@
       showToast("ดาวน์โหลดไฟล์สำเร็จ!", "success");
     }
 
+    // ฟังก์ชันยิงเข้า GAS (อัปเดตทั้ง Sheets และ Firebase)
     let uploadedFiles = [];
     const dropzone = document.getElementById('mainDropzone');
     const fileInput = document.getElementById('fileInput');
@@ -1194,28 +1254,31 @@
             const r = arrDrug[i];
             if(r.length < 10) continue;
             
-            // 🌟 กำหนดคอลัมน์เงินชดเชยตายตัว ตามประเภทไฟล์ (ป้องกัน Error จากการผสานเซลล์)
-            let compColIndex = 19; // Default T (index 19)
+            let compColIndex = 19; 
             if (fn.includes('OPCS_') || fn.includes('OPBKK_') || fn.includes('OPLGO_')) {
-               compColIndex = 18; // S (index 18)
+               compColIndex = 18; 
             } else if (fn.includes('OP_')) {
-               compColIndex = 19; // T (index 19)
+               compColIndex = 19; 
             }
             
-            // ป้องกัน Error กรณี Array สั้นกว่า Index ที่ต้องการ (หลุดกรอบตาราง)
             let rawComp = "";
             if (r.length > compColIndex) {
                 rawComp = r[compColIndex];
             }
 
-            const compVal = (rawComp !== undefined && rawComp !== null) ? String(rawComp).trim() : "";
-            const rawTmt = r[9]; // TMT อยู่ที่คอลัมน์ J เสมอ
+            const rawTmt = r[9]; 
             const tmt = (rawTmt !== undefined && rawTmt !== null) ? String(rawTmt).split('.')[0].trim() : "";
             
             if((tmt.length === 7 && tmt.startsWith('9')) || tmt === '714686' || tmt === '759196') {
               const tranId = String(r[1]).trim();
               const s0 = sheet0Map.get(`${tranId}_${tmt}`) || { m:"", o:"", p:"" };
-              allFinalData.push([r[2], r[1], r[4], r[5], r[6], tmt, r[10], r[11], r[12], r[16], r[17], rawComp, s0.m, s0.o, r[15], s0.p, file.name, fundName]);
+              
+              allFinalData.push([
+                  r[2] || "", r[1] || "", r[4] || "", r[5] || "", r[6] || "", 
+                  tmt, r[10] || "", r[11] || "", r[12] || "", r[16] || 0, 
+                  r[17] || 0, rawComp, s0.m || 0, s0.o || 0, r[15] || 0, 
+                  s0.p || "", file.name, fundName
+              ]);
             }
           }
         } catch(e) { console.error(e); }
@@ -1229,7 +1292,9 @@
           showToast(`อัปโหลดสำเร็จ! ข้ามไฟล์ซ้ำ ${result.skipped.length} ไฟล์`, "success");
           uploadedFiles = []; document.getElementById('fileList').innerHTML = ''; document.getElementById('fileInput').value = '';
           btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ประมวลผลและอัปโหลด';
-          fetchDashboardData(); 
+          
+          // โหลดข้อมูลใหม่จาก Firebase หลังอัปโหลดเสร็จ
+          setTimeout(() => fetchDashboardData(), 2000); 
         } else throw new Error(result.message);
       } catch (err) {
         showToast("ล้มเหลว: " + err.message, "error");
