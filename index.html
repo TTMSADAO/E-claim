@@ -66,12 +66,14 @@
     .filter-box { background: white; padding: 12px 20px; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; max-width: max-content; }
     .filter-box select { padding: 10px 15px; border-radius: 12px; border: 1px solid #cbd5e1; outline: none; font-family: 'Sarabun'; font-weight: 600; cursor: pointer; background: #f8fafc; color: var(--text); }
     
-    .btn-sync, .btn-export, .btn-search { padding: 10px 15px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; border: none; }
+    .btn-sync, .btn-export, .btn-search, .btn-db { padding: 10px 15px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; border: none; }
     .btn-sync { background: white; color: var(--accent); border: 1px solid var(--accent); }
     .btn-sync:active { background: var(--accent); color: white; }
     .btn-export { background: var(--success); color: white; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); }
     .btn-search { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(30, 41, 59, 0.2); }
     .btn-search:hover { background: #334155; }
+    .btn-db { background: #cbd5e1; color: var(--primary); border: none; }
+    .btn-db:hover { background: #94a3b8; }
 
     .filter-label { font-size: 14px; font-weight: 700; color: #475569; margin: 0 5px; }
 
@@ -201,7 +203,7 @@
 
   <div id="loading-overlay">
     <i class="fa-solid fa-circle-notch fa-spin spinner"></i>
-    <h3 style="color: var(--primary); font-weight: 700; font-family: 'Poppins';">Syncing Database...</h3>
+    <h3 style="color: var(--primary); font-weight: 700; font-family: 'Poppins';">กำลังโหลดข้อมูล...</h3>
   </div>
 
   <div class="sidebar" id="sidebar">
@@ -243,7 +245,7 @@
             <p style="color: #64748b; font-size: 14px;">วิเคราะห์ Performance การเบิกจ่าย และระบบบัญชีบริหารต้นทุน-กำไร</p>
           </div>
           <div class="filter-box">
-            <button class="btn-sync" onclick="fetchDashboardData()"><i class="fa-solid fa-rotate"></i> ซิงค์</button>
+            <button class="btn-sync" onclick="fetchDashboardData()"><i class="fa-solid fa-rotate"></i> ซิงค์ใหม่</button>
             <div class="separator" style="width: 1px; height: 25px; background: #e2e8f0;"></div>
             <span class="filter-label"><i class="fa-solid fa-hospital-user text-blue"></i> กองทุน/สิทธิ:</span> <select id="fundPeriod" onchange="renderDashboard()"><option value="ALL">รวมทุกสิทธิการรักษา</option></select>
             <span class="filter-label"><i class="fa-regular fa-calendar-days"></i> ตั้งแต่:</span> <select id="startPeriod" onchange="renderDashboard()"><option value="ALL">ทั้งหมด</option></select>
@@ -498,13 +500,13 @@
       databaseURL: "https://e-claim-cb9de-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
     
-    // ตั้งค่า Secret Key สำหรับยิงข้อมูลตรงเข้า Database แบบ Admin Bypass (ใช้งานเฉพาะกรณีดึงข้อมูลตรงๆ ถ้าใช้ผ่าน GAS ไม่ต้องใช้)
+    // ตั้งค่า Secret Key สำหรับยิงข้อมูลตรงเข้า Database แบบ Admin Bypass (ใช้เฉพาะอ่านข้อมูล)
     const DB_SECRET = "db3X6wQyWFphqUj9XillzFjwP5487Abw0KvXfeYCer";
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // ส่วนของ Apps Script เดิม สำหรับ Upload
+    // ส่วนของ Apps Script เดิม สำหรับ Upload และบันทึกลง Google Sheets
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyWfO2LTHuo8UV4ln26Jecos3KKansPxXfXENk1YreDgiuXwPF8sFOCrfIQsLUNk3gRA/exec';
     
     let isAdmin = false;
@@ -525,19 +527,6 @@
       if (typeof val === 'number' && !isNaN(val)) return val;
       let parsed = parseFloat(val);
       return isNaN(parsed) ? 0 : parsed;
-    }
-    
-    function extractMonthYear(rawVal, displayVal) {
-      let str = String(displayVal || rawVal || "").trim();
-      if (str.includes('/')) {
-        let parts = str.split('/');
-        if (parts.length >= 3) return { m: parts[1].padStart(2, '0'), y: parts[2].substring(0, 4) };
-      }
-      if (str.includes('-')) {
-        let parts = str.split('T')[0].split('-');
-        if (parts.length >= 3) return { m: parts[1].padStart(2, '0'), y: parts[0] };
-      }
-      return { m: "ไม่ระบุ", y: "ไม่ระบุ" };
     }
 
     function initApp() { fetchDashboardData(); }
@@ -581,11 +570,7 @@
     function switchTab(tab) {
       if (window.innerWidth <= 1024) toggleSidebar(); 
       if ((tab === 'drug' || tab === 'upload' || tab === 'db') && !isAdmin) { showLogin(() => switchTab(tab)); return; }
-      
-      if (tab === 'db') { 
-          window.open('https://docs.google.com/spreadsheets/d/1pEeKv-9lSO-amw6uIEAuPUDPXoJ5LbVIz40JTe14ah0/edit', '_blank'); 
-          return; 
-      }
+      if (tab === 'db') { openDatabase(); return; }
 
       document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -597,14 +582,17 @@
       else if(tab === 'upload') document.getElementById('page-title').innerText = 'ระบบนำเข้าข้อมูล';
     }
 
+    function openDatabase() {
+      window.open('https://docs.google.com/spreadsheets/d/1pEeKv-9lSO-amw6uIEAuPUDPXoJ5LbVIz40JTe14ah0/edit', '_blank');
+    }
+
     let globalSheetData = []; 
     let globalDrugTotalTxMap = {}; 
 
-    // 🌟 ดึงข้อมูลจาก Firebase (เร็วกว่า Google Sheets 10 เท่า!)
+    // 🌟 ดึงข้อมูลจาก Firebase ทันทีแบบ Resilient
     async function fetchDashboardData() {
       document.getElementById('loading-overlay').classList.add('show');
       try {
-        // ยิงผ่าน REST API ของ Firebase โดยใช้ auth token (secret key)
         const response = await fetch(`${firebaseConfig.databaseURL}/eclaim_data.json?auth=${DB_SECRET}`);
         if (!response.ok) throw new Error("HTTP Error: " + response.status);
         const data = await response.json();
@@ -613,29 +601,34 @@
         globalDrugTotalTxMap = {};
         
         if (data) {
-            // วนลูปแปลง Object ของ Firebase กลับมาเป็น Array ให้เหมือนเดิม
-            Object.keys(data).forEach(key => {
-                const d = data[key];
-                const { m, y } = extractMonthYear(d.date, d.date);
-                
-                const tmt = String(d.tmt || "").trim();
-                const req = safeNum(d.req);
-                const comp = safeNum(d.comp);
-                const qty = safeNum(d.qty);
-                
-                let cat = "";
-                if (comp <= 0) { cat = "C3"; } 
-                else if (comp < req) { cat = "C2"; } 
-                else { cat = "C1"; }
+            // ดึงค่าทุก key ภายใต้ eclaim_data
+            Object.values(data).forEach(d => {
+                // ข้ามข้อมูลที่พัง หรือไม่มีชื่อยา
+                if(!d || !d.drug) return;
 
+                // รองรับชื่อตัวแปรทั้ง d.drug และ d.drugName (กันเหนียว)
+                const drugName = d.drug || d.drugName || "ไม่ทราบชื่อยา";
+                
                 const formattedRow = {
-                    date: d.date, month: m, year: y, pid: d.pid, tmt: tmt, drug: d.drug, fund: d.fund,
-                    req: req, comp: comp, qty: qty, cost: safeNum(d.cost), profit: safeNum(d.profit), cat: cat, reason: d.reason,
-                    filename: d.filename
+                    date: d.date || "-", 
+                    month: d.month || "ไม่ระบุ", 
+                    year: d.year || "ไม่ระบุ", 
+                    pid: d.pid || "-", 
+                    tmt: d.tmt || "-", 
+                    drug: drugName, 
+                    fund: d.fund || "ไม่ระบุ",
+                    req: safeNum(d.req), 
+                    comp: safeNum(d.comp), 
+                    qty: safeNum(d.qty), 
+                    cost: safeNum(d.cost), 
+                    profit: safeNum(d.profit), 
+                    cat: d.cat || "C3", 
+                    reason: d.reason || "",
+                    filename: d.filename || ""
                 };
                 
                 globalSheetData.push(formattedRow);
-                globalDrugTotalTxMap[d.drug] = (globalDrugTotalTxMap[d.drug] || 0) + 1;
+                globalDrugTotalTxMap[drugName] = (globalDrugTotalTxMap[drugName] || 0) + 1;
             });
         }
         
@@ -1200,7 +1193,6 @@
       showToast("ดาวน์โหลดไฟล์สำเร็จ!", "success");
     }
 
-    // ฟังก์ชันยิงเข้า GAS (อัปเดตทั้ง Sheets และ Firebase)
     let uploadedFiles = [];
     const dropzone = document.getElementById('mainDropzone');
     const fileInput = document.getElementById('fileInput');
@@ -1293,8 +1285,8 @@
           uploadedFiles = []; document.getElementById('fileList').innerHTML = ''; document.getElementById('fileInput').value = '';
           btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ประมวลผลและอัปโหลด';
           
-          // โหลดข้อมูลใหม่จาก Firebase หลังอัปโหลดเสร็จ
-          setTimeout(() => fetchDashboardData(), 2000); 
+          // โหลดข้อมูลใหม่จาก Firebase หลังอัปโหลดเสร็จ (ให้เวลา Apps Script ส่งข้อมูลเข้า Firebase 3 วินาที)
+          setTimeout(() => fetchDashboardData(), 3000); 
         } else throw new Error(result.message);
       } catch (err) {
         showToast("ล้มเหลว: " + err.message, "error");
