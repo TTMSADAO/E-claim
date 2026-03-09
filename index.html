@@ -24,8 +24,8 @@
     
     .sidebar { width: 300px; background: rgba(30, 41, 59, 0.98); backdrop-filter: blur(20px); color: white; display: flex; flex-direction: column; z-index: 1000; box-shadow: 10px 0 30px rgba(0,0,0,0.1); border-right: 1px solid rgba(255,255,255,0.05); transition: 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); }
     .logo-area { padding: 40px 25px 25px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .logo-area  { width: 80px; height: auto; margin-bottom: 15px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.4)); transition: 0.3s; }
-    .logo-area :hover { transform: scale(1.05); }
+    .logo-area img { width: 80px; height: auto; margin-bottom: 15px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.4)); transition: 0.3s; }
+    .logo-area img:hover { transform: scale(1.05); }
     .logo-area h2 { font-family: 'Poppins', sans-serif; font-size: 20px; font-weight: 800; background: linear-gradient(to right, #7dd3fc, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.2; letter-spacing: 0.5px; }
     .nav-links { padding: 20px 0; flex: 1; overflow-y: auto; }
     .nav-item { padding: 18px 30px; display: flex; align-items: center; gap: 15px; color: #94a3b8; cursor: pointer; font-weight: 500; transition: all 0.3s; border-left: 4px solid transparent; position: relative; }
@@ -206,7 +206,7 @@
 
   <div class="sidebar" id="sidebar">
     <div class="logo-area">
-      <img src="" alt="Logo">
+      <img src="https://img2.pic.in.th/pic/6f7b352408393a1295f3000e7d9e6754.md.png" alt="Logo">
       <h2>E-Claim TTM<br><span style="color: white; font-size: 15px; font-weight: 500;">Cost Analytics</span></h2>
     </div>
     <div class="nav-links">
@@ -620,7 +620,6 @@
       sortedDrugs.forEach(dr => { drugHtml += `<option value="${dr}">${dr}</option>`; });
       drugFilter.innerHTML = drugHtml;
       
-      // 🌟 เพิ่มตัวกรองแบบกลุ่ม "รวมสิทธิเบิกตรง"
       let fundHtml = '<option value="ALL">รวมทุกสิทธิการรักษา</option>';
       fundHtml += '<option value="CS_ALL" style="font-weight:bold; color:var(--accent);">📌 รวมสิทธิเบิกตรง (CS/BKK/LGO)</option>';
       Array.from(funds).sort().forEach(f => { fundHtml += `<option value="${f}"> - ${f}</option>`; });
@@ -642,7 +641,6 @@
         
         let passFund = true;
         if (fundVal === "CS_ALL") {
-            // ถ้าระบุว่าเอาเบิกตรงทั้งหมด ให้เอา 3 กองทุนนี้มาโชว์รวมกัน
             passFund = (d.fund === "CS (ข้าราชการ/เบิกตรง)" || d.fund === "BKK (กทม.)" || d.fund === "LGO (อปท.)");
         } else if (fundVal !== "ALL") {
             passFund = (d.fund === fundVal);
@@ -1041,7 +1039,6 @@
           const dVal = `${d.year}-${String(d.month).padStart(2, '0')}`;
           passDate = (startVal === "ALL" ? true : dVal >= startVal) && (endVal === "ALL" ? true : dVal <= endVal);
         }
-        
         let passDrug = (selectedDrug === "ALL") ? true : (d.drug === selectedDrug);
         
         let passFund = true;
@@ -1197,12 +1194,12 @@
             const r = arrDrug[i];
             if(r.length < 10) continue;
             
-            // 🌟 Safeguard: อ่านคอลัมน์เงินชดเชย โดยล็อก Index ตามชื่อไฟล์
-            let compColIndex = 19; // ค่าตั้งต้นคือ T
+            // 🌟 กำหนดคอลัมน์เงินชดเชยตายตัว ตามประเภทไฟล์ (ป้องกัน Error จากการผสานเซลล์)
+            let compColIndex = 19; // Default T (index 19)
             if (fn.includes('OPCS_') || fn.includes('OPBKK_') || fn.includes('OPLGO_')) {
-               compColIndex = 18; // ถ้าเป็นกลุ่มเบิกตรง ล็อกเป็น S
+               compColIndex = 18; // S (index 18)
             } else if (fn.includes('OP_')) {
-               compColIndex = 19; // ถ้าเป็นบัตรทอง ล็อกเป็น T
+               compColIndex = 19; // T (index 19)
             }
             
             // ป้องกัน Error กรณี Array สั้นกว่า Index ที่ต้องการ (หลุดกรอบตาราง)
@@ -1218,14 +1215,7 @@
             if((tmt.length === 7 && tmt.startsWith('9')) || tmt === '714686' || tmt === '759196') {
               const tranId = String(r[1]).trim();
               const s0 = sheet0Map.get(`${tranId}_${tmt}`) || { m:"", o:"", p:"" };
-              
-              // ยัดข้อมูลลง Array ความยาว 18 ช่องเป๊ะๆ
-              allFinalData.push([
-                  r[2] || "", r[1] || "", r[4] || "", r[5] || "", r[6] || "", 
-                  tmt, r[10] || "", r[11] || "", r[12] || "", r[16] || 0, 
-                  r[17] || 0, rawComp, s0.m || 0, s0.o || 0, r[15] || 0, 
-                  s0.p || "", file.name, fundName
-              ]);
+              allFinalData.push([r[2], r[1], r[4], r[5], r[6], tmt, r[10], r[11], r[12], r[16], r[17], rawComp, s0.m, s0.o, r[15], s0.p, file.name, fundName]);
             }
           }
         } catch(e) { console.error(e); }
