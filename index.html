@@ -203,7 +203,7 @@
 
   <div id="loading-overlay">
     <i class="fa-solid fa-circle-notch fa-spin spinner"></i>
-    <h3 style="color: var(--primary); font-weight: 700; font-family: 'Poppins';">กำลังโหลดข้อมูล...</h3>
+    <h3 style="color: var(--primary); font-weight: 700; font-family: 'Poppins';">Syncing Database...</h3>
   </div>
 
   <div class="sidebar" id="sidebar">
@@ -245,7 +245,7 @@
             <p style="color: #64748b; font-size: 14px;">วิเคราะห์ Performance การเบิกจ่าย และระบบบัญชีบริหารต้นทุน-กำไร</p>
           </div>
           <div class="filter-box">
-            <button class="btn-sync" onclick="fetchDashboardData()"><i class="fa-solid fa-rotate"></i> ซิงค์ใหม่</button>
+            <button class="btn-sync" onclick="fetchDashboardData()"><i class="fa-solid fa-rotate"></i> ซิงค์</button>
             <div class="separator" style="width: 1px; height: 25px; background: #e2e8f0;"></div>
             <span class="filter-label"><i class="fa-solid fa-hospital-user text-blue"></i> กองทุน/สิทธิ:</span> <select id="fundPeriod" onchange="renderDashboard()"><option value="ALL">รวมทุกสิทธิการรักษา</option></select>
             <span class="filter-label"><i class="fa-regular fa-calendar-days"></i> ตั้งแต่:</span> <select id="startPeriod" onchange="renderDashboard()"><option value="ALL">ทั้งหมด</option></select>
@@ -491,20 +491,8 @@
 
   <div id="toast"><i id="toast-icon" class="fa-solid fa-info-circle"></i> <span id="toast-msg">ข้อความ</span></div>
 
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
   <script>
-    // 🌟 1. Firebase Configuration
-    const firebaseConfig = {
-      databaseURL: "https://e-claim-cb9de-default-rtdb.asia-southeast1.firebasedatabase.app"
-    };
-    const DB_SECRET = "db3X6wQyWFphqUj9XillzFjwP5487Abw0KvXfeYCer";
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // ส่วนของ Apps Script เดิม สำหรับ Upload และบันทึกลง Google Sheets
+    // 🌟 URL ของ Google Apps Script (ตัวเดิมที่ใช้งานได้ชัวร์ๆ)
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyWfO2LTHuo8UV4ln26Jecos3KKansPxXfXENk1YreDgiuXwPF8sFOCrfIQsLUNk3gRA/exec';
     
     let isAdmin = false;
@@ -587,75 +575,22 @@
     let globalSheetData = []; 
     let globalDrugTotalTxMap = {}; 
 
-    // 🌟 ดึงข้อมูลจาก Firebase พร้อมระบบโอนย้ายอัตโนมัติ (Auto-Migration)
+    // 🌟 ดึงข้อมูลจาก Google Sheets (Apps Script) เหมือนเดิม
     async function fetchDashboardData() {
       document.getElementById('loading-overlay').classList.add('show');
       try {
-        const response = await fetch(`${firebaseConfig.databaseURL}/eclaim_data.json?auth=${DB_SECRET}`);
+        const response = await fetch(GAS_URL);
         if (!response.ok) throw new Error("HTTP Error: " + response.status);
-        const data = await response.json();
-        
-        globalSheetData = [];
-        globalDrugTotalTxMap = {};
-        
-        if (data && Object.keys(data).length > 0) {
-            // ถ้า Firebase มีข้อมูล ให้ดึงมาแสดงปกติ
-            Object.values(data).forEach(d => {
-                if(!d || !d.drug) return;
-                const drugName = d.drug || d.drugName || "ไม่ทราบชื่อยา";
-                const formattedRow = {
-                    date: d.date || "-", month: d.month || "ไม่ระบุ", year: d.year || "ไม่ระบุ", 
-                    pid: d.pid || "-", tmt: d.tmt || "-", drug: drugName, fund: d.fund || "ไม่ระบุ",
-                    req: safeNum(d.req), comp: safeNum(d.comp), qty: safeNum(d.qty), 
-                    cost: safeNum(d.cost), profit: safeNum(d.profit), cat: d.cat || "C3", 
-                    reason: d.reason || "", filename: d.filename || ""
-                };
-                globalSheetData.push(formattedRow);
-                globalDrugTotalTxMap[drugName] = (globalDrugTotalTxMap[drugName] || 0) + 1;
-            });
-            
-            populateFilters(); 
-            renderDashboard();
-            showToast("ซิงค์ข้อมูลจาก Firebase สำเร็จ ⚡", "success");
-            
-        } else {
-            // 🚨 ถ้า Firebase ว่างเปล่า ให้โอนย้ายข้อมูลจาก Google Sheets (Apps Script) มาใส่ Firebase ก่อน
-            showToast("พบว่า Firebase ว่างเปล่า กำลังดึงข้อมูลเก่าจาก Sheets...", "info");
-            const gasResponse = await fetch(GAS_URL);
-            const gasResult = await gasResponse.json();
-            
-            if (gasResult.status === "success" && gasResult.data && gasResult.data.length > 0) {
-                const firebaseUpdates = {};
-                gasResult.data.forEach((d, i) => {
-                    const key = `rec_old_${i}`;
-                    firebaseUpdates[key] = {
-                        date: d.date || "-", month: d.month || "", year: d.year || "",
-                        pid: d.pid || "", tmt: d.tmt || "", drug: d.drug || "",
-                        fund: d.fund || "ไม่ระบุ", req: d.req || 0, comp: d.comp || 0,
-                        qty: d.qty || 0, cost: d.cost || 0, profit: d.profit || 0,
-                        cat: d.cat || "C3", reason: d.reason || "", filename: "migrated_from_sheets"
-                    };
-                });
-                
-                // ยัดข้อมูลเก่าเข้า Firebase
-                await fetch(`${firebaseConfig.databaseURL}/eclaim_data.json?auth=${DB_SECRET}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify(firebaseUpdates)
-                });
-                
-                showToast("คัดลอกข้อมูลเก่าลง Firebase สำเร็จ! โหลดอีกครั้ง...", "success");
-                setTimeout(fetchDashboardData, 1500); // รีโหลดฟังก์ชันเดิมเพื่อดึงข้อมูลจาก Firebase มาวาดกราฟ
-                return;
-            } else {
-                showToast("ไม่พบข้อมูลเก่าใน Sheets", "error");
-                populateFilters(); 
-                renderDashboard();
-            }
-        }
-      } catch(e) { 
-          showToast("ล้มเหลว: " + e.message, "error"); 
-          console.error(e);
-      }
+        const result = await response.json();
+        if(result.status === "success") {
+          globalSheetData = result.data; 
+          globalDrugTotalTxMap = {};
+          globalSheetData.forEach(d => { globalDrugTotalTxMap[d.drug] = (globalDrugTotalTxMap[d.drug] || 0) + 1; });
+          populateFilters(); 
+          renderDashboard();
+          showToast("ซิงค์ฐานข้อมูลสำเร็จ", "success");
+        } else throw new Error(result.message || "Unknown Error");
+      } catch(e) { showToast("ไม่สามารถดึงข้อมูลได้: " + e.message, "error"); }
       document.getElementById('loading-overlay').classList.remove('show');
     }
 
@@ -690,6 +625,7 @@
       drugFilter.innerHTML = drugHtml;
       
       let fundHtml = '<option value="ALL">รวมทุกสิทธิการรักษา</option>';
+      // 🌟 ตัวเลือก รวมสิทธิเบิกตรง
       fundHtml += '<option value="CS_ALL" style="font-weight:bold; color:var(--accent);">📌 รวมสิทธิเบิกตรง (CS/BKK/LGO)</option>';
       Array.from(funds).sort().forEach(f => { fundHtml += `<option value="${f}"> - ${f}</option>`; });
       fundSelect.innerHTML = fundHtml;
@@ -710,6 +646,7 @@
         
         let passFund = true;
         if (fundVal === "CS_ALL") {
+            // ถ้าระบุว่าเอาเบิกตรงทั้งหมด ให้เอา 3 กองทุนนี้มาโชว์รวมกัน
             passFund = (d.fund === "CS (ข้าราชการ/เบิกตรง)" || d.fund === "BKK (กทม.)" || d.fund === "LGO (อปท.)");
         } else if (fundVal !== "ALL") {
             passFund = (d.fund === fundVal);
@@ -1210,9 +1147,6 @@
       showToast("ดาวน์โหลดไฟล์สำเร็จ!", "success");
     }
 
-    const eclaimRef = db.ref('eclaim_data');
-    const logsRef = db.ref('upload_logs');
-
     let uploadedFiles = [];
     const dropzone = document.getElementById('mainDropzone');
     const fileInput = document.getElementById('fileInput');
@@ -1235,21 +1169,8 @@
       let allFinalData = []; 
       showToast(`กำลังประมวลผล ${uploadedFiles.length} ไฟล์...`, "info");
 
-      try {
-        const logsSnapshot = await logsRef.once('value');
-        const existingFiles = logsSnapshot.val() || {};
-        const existingFileNames = Object.keys(existingFiles).map(k => existingFiles[k].filename);
-
-        let uploadPromises = [];
-        let newRecordsCount = 0;
-        let skippedFilesCount = 0;
-
-        for (const file of uploadedFiles) {
-          if (existingFileNames.includes(file.name)) {
-              skippedFilesCount++;
-              continue;
-          }
-
+      for (const file of uploadedFiles) {
+        try {
           const data = await readFileAsArrayBuffer(file);
           const workbook = XLSX.read(data, {type: 'array', cellText:false, cellDates:true});
           const nameDrug = workbook.SheetNames.find(n => n.toLowerCase().includes('drug'));
@@ -1266,20 +1187,6 @@
           else if(fn.includes('OPLGO_')) fundName = "LGO (อปท.)";
           else if(fn.includes('OP_')) fundName = "UC (บัตรทอง)";
 
-          let compColIndex = 19; 
-          for(let r=0; r<Math.min(arrDrug.length, 6); r++) {
-            if(!arrDrug[r]) continue;
-            for(let c=15; c<25; c++) {
-              if(arrDrug[r][c] === undefined) continue;
-              let val = String(arrDrug[r][c]).replace(/\s+/g, '').trim();
-              if(fundName === "UC (บัตรทอง)") {
-                  if(val.includes("ชดเชยสปสช.") || val.includes("รวมชดเชย")) compColIndex = c;
-              } else {
-                  if(val.includes("ErrorCode")) compColIndex = c - 1; 
-              }
-            }
-          }
-
           const sheet0Map = new Map();
           for(let i=0; i<arrSheet0.length; i++) {
             const r = arrSheet0[i];
@@ -1289,65 +1196,47 @@
             if(tranId && tranId !== "TRAN_ID") sheet0Map.set(`${tranId}_${tmt}`, { m: r[12], o: r[14], p: r[15] });
           }
 
-          const fileDataUpdates = {}; 
-
           for(let i=0; i<arrDrug.length; i++) {
             const r = arrDrug[i];
             if(r.length < 10) continue;
+            
+            // 🌟 ล็อก Index คอลัมน์เงินชดเชยตามชื่อไฟล์ (แก้ Error จากตารางผสานเซลล์)
+            let compColIndex = 19; // Default T (index 19)
+            if (fn.includes('OPCS_') || fn.includes('OPBKK_') || fn.includes('OPLGO_')) {
+               compColIndex = 18; // S (index 18)
+            } else if (fn.includes('OP_')) {
+               compColIndex = 19; // T (index 19)
+            }
             
             let rawComp = "";
             if (r.length > compColIndex) {
                 rawComp = r[compColIndex];
             }
 
+            const compVal = (rawComp !== undefined && rawComp !== null) ? String(rawComp).trim() : "";
             const rawTmt = r[9]; 
             const tmt = (rawTmt !== undefined && rawTmt !== null) ? String(rawTmt).split('.')[0].trim() : "";
             
             if((tmt.length === 7 && tmt.startsWith('9')) || tmt === '714686' || tmt === '759196') {
               const tranId = String(r[1]).trim();
               const s0 = sheet0Map.get(`${tranId}_${tmt}`) || { m:"", o:"", p:"" };
-              
-              const recordId = eclaimRef.push().key; 
-              fileDataUpdates[recordId] = {
-                  date: r[2] || "", tranId: r[1] || "", pid: r[4] || "",
-                  tmt: tmt, drugName: r[10] || "", req: r[17] || 0,
-                  comp: rawComp === "" ? 0 : rawComp, 
-                  qty: r[15] || 0, reason: s0.p || "",
-                  fund: fundName, filename: file.name
-              };
-              
-              allFinalData.push([
-                  r[2] || "", r[1] || "", r[4] || "", r[5] || "", r[6] || "", 
-                  tmt, r[10] || "", r[11] || "", r[12] || "", r[16] || 0, 
-                  r[17] || 0, rawComp, s0.m || 0, s0.o || 0, r[15] || 0, 
-                  s0.p || "", file.name, fundName
-              ]);
-              newRecordsCount++;
+              allFinalData.push([r[2], r[1], r[4], r[5], r[6], tmt, r[10], r[11], r[12], r[16], r[17], rawComp, s0.m, s0.o, r[15], s0.p, file.name, fundName]);
             }
           }
-          
-          if (Object.keys(fileDataUpdates).length > 0) {
-              uploadPromises.push(eclaimRef.update(fileDataUpdates));
-          }
-          uploadPromises.push(logsRef.push({ filename: file.name, timestamp: firebase.database.ServerValue.TIMESTAMP }));
-        }
+        } catch(e) { console.error(e); }
+      }
 
-        showToast("กำลังส่งข้อมูลขึ้น Database...", "info");
-        await Promise.all(uploadPromises); 
-        
-        // ส่ง Backup ลง Google Sheets
-        if(allFinalData.length > 0) {
-            await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ files: uploadedFiles.map(f => f.name), data: allFinalData }) });
-        }
-        
-        showToast(`อัปโหลดสำเร็จ! ข้อมูลใหม่ ${newRecordsCount} รายการ (ข้ามไฟล์ซ้ำ ${skippedFilesCount} ไฟล์)`, "success");
-        uploadedFiles = []; document.getElementById('fileList').innerHTML = ''; document.getElementById('fileInput').value = '';
-        btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ประมวลผลและอัปโหลด';
-        
-        setTimeout(() => fetchDashboardData(), 1500); 
-
+      showToast("กำลังส่งข้อมูลขึ้น Database...", "info");
+      try {
+        const response = await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ files: uploadedFiles.map(f => f.name), data: allFinalData }) });
+        const result = await response.json();
+        if(result.status === "success") {
+          showToast(`อัปโหลดสำเร็จ! ข้ามไฟล์ซ้ำ ${result.skipped.length} ไฟล์`, "success");
+          uploadedFiles = []; document.getElementById('fileList').innerHTML = ''; document.getElementById('fileInput').value = '';
+          btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ประมวลผลและอัปโหลด';
+          fetchDashboardData(); 
+        } else throw new Error(result.message);
       } catch (err) {
-        console.error(err);
         showToast("ล้มเหลว: " + err.message, "error");
         btnSubmit.disabled = false; btnSubmit.innerHTML = 'ลองส่งอีกครั้ง';
       }
