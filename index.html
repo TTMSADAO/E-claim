@@ -66,14 +66,12 @@
     .filter-box { background: white; padding: 12px 20px; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; max-width: max-content; }
     .filter-box select { padding: 10px 15px; border-radius: 12px; border: 1px solid #cbd5e1; outline: none; font-family: 'Sarabun'; font-weight: 600; cursor: pointer; background: #f8fafc; color: var(--text); }
     
-    .btn-sync, .btn-export, .btn-search, .btn-db { padding: 10px 15px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; border: none; }
+    .btn-sync, .btn-export, .btn-search { padding: 10px 15px; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; border: none; }
     .btn-sync { background: white; color: var(--accent); border: 1px solid var(--accent); }
     .btn-sync:active { background: var(--accent); color: white; }
     .btn-export { background: var(--success); color: white; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); }
     .btn-search { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(30, 41, 59, 0.2); }
     .btn-search:hover { background: #334155; }
-    .btn-db { background: #cbd5e1; color: var(--primary); border: none; }
-    .btn-db:hover { background: #94a3b8; }
 
     .filter-label { font-size: 14px; font-weight: 700; color: #475569; margin: 0 5px; }
 
@@ -167,9 +165,11 @@
 
     #toast { visibility: hidden; min-width: 250px; background: var(--primary); color: #fff; border-radius: 12px; padding: 15px 20px; position: fixed; right: 20px; top: 20px; z-index: 9999; display: flex; align-items: center; gap: 10px; opacity: 0; transition: 0.4s; font-weight: 600; box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: translateY(-20px); font-size: 14px; }
     #toast.show { visibility: visible; opacity: 1; transform: translateY(0); }
-    #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(248,250,252,0.9); backdrop-filter: blur(5px); z-index: 9999; display: none; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; }
+    
+    /* 🌟 ปรับปรุงหน้าจอโหลดข้อมูลแบบผู้บริหาร (UX Trick) */
+    #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(248,250,252,0.95); backdrop-filter: blur(8px); z-index: 9999; display: none; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px; transition: opacity 0.5s; }
     #loading-overlay.show { display: flex; }
-    .spinner { font-size: 40px; color: var(--accent); margin-bottom: 15px; }
+    .spinner { font-size: 45px; color: var(--accent); margin-bottom: 20px; filter: drop-shadow(0 4px 10px rgba(14, 165, 233, 0.3)); }
 
     @media (max-width: 1024px) {
       .sidebar { position: fixed; left: -300px; height: 100%; }
@@ -202,8 +202,12 @@
   </div>
 
   <div id="loading-overlay">
-    <i class="fa-solid fa-circle-notch fa-spin spinner"></i>
-    <h3 style="color: var(--primary); font-weight: 700; font-family: 'Poppins';">Syncing Database...</h3>
+    <i class="fa-solid fa-chart-pie fa-spin spinner"></i>
+    <h3 style="color: var(--primary); font-weight: 800; font-family: 'Poppins'; font-size: 22px; margin-bottom: 10px;">Executive Dashboard</h3>
+    <div style="background: #e2e8f0; width: 280px; height: 6px; border-radius: 10px; overflow: hidden; margin-bottom: 15px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+      <div id="loading-progress" style="background: linear-gradient(90deg, var(--secondary), var(--accent)); width: 0%; height: 100%; transition: 0.5s ease;"></div>
+    </div>
+    <p id="loading-text" style="font-size: 14px; font-weight: 600; color: #64748b;">กำลังเชื่อมต่อฐานข้อมูล...</p>
   </div>
 
   <div class="sidebar" id="sidebar">
@@ -245,7 +249,7 @@
             <p style="color: #64748b; font-size: 14px;">วิเคราะห์ Performance การเบิกจ่าย และระบบบัญชีบริหารต้นทุน-กำไร</p>
           </div>
           <div class="filter-box">
-            <button class="btn-sync" onclick="fetchDashboardData()"><i class="fa-solid fa-rotate"></i> ซิงค์</button>
+            <button class="btn-sync" onclick="fetchDashboardData(true)"><i class="fa-solid fa-rotate"></i> ซิงค์ดึงข้อมูลล่าสุด</button>
             <div class="separator" style="width: 1px; height: 25px; background: #e2e8f0;"></div>
             <span class="filter-label"><i class="fa-solid fa-hospital-user text-blue"></i> กองทุน/สิทธิ:</span> <select id="fundPeriod" onchange="renderDashboard()"><option value="ALL">รวมทุกสิทธิการรักษา</option></select>
             <span class="filter-label"><i class="fa-regular fa-calendar-days"></i> ตั้งแต่:</span> <select id="startPeriod" onchange="renderDashboard()"><option value="ALL">ทั้งหมด</option></select>
@@ -492,7 +496,6 @@
   <div id="toast"><i id="toast-icon" class="fa-solid fa-info-circle"></i> <span id="toast-msg">ข้อความ</span></div>
 
   <script>
-    // 🌟 URL ของ Google Apps Script (ตัวเดิมที่ใช้งานได้ชัวร์ๆ)
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyWfO2LTHuo8UV4ln26Jecos3KKansPxXfXENk1YreDgiuXwPF8sFOCrfIQsLUNk3gRA/exec';
     
     let isAdmin = false;
@@ -509,10 +512,36 @@
     Chart.register(ChartDataLabels);
     Chart.defaults.font.family = 'Sarabun';
 
+    // ดาต้าเบสต้นทุนยา ฝังไว้คำนวณที่หน้าเว็บให้ไวขึ้น
+    const DRUG_COSTS = {
+      '9094251': 0.8, '714686': 35.31, '9385281': 0.95, '759196': 38.52,
+      '9372629': 15, '9097154': 33, '9371406': 0.85, '9368310': 1.05,
+      '9376776': 1.83, '9373829': 12, '9374072': 0.85, '9419041': 25,
+      '9385321': 0.85, '9092603': 0.95, '9368231': 0.85, '9368220': 0.8,
+      '9368352': 0.8, '9093452': 0.8, '9373855': 1.05, '9398286': 35,
+      '9382458': 3.5, '9368208': 25, '9094192': 0.8, '9399615': 100,
+      '9398390': 3.5, '9368347': 0.25, '9375658': 0.85, '9373840': 0.85,
+      '9385223': 0.85, '9378924': 0.85, '9369874': 50, '9093803': 0.6,
+      '9398451': 2.68, '9398405': 2.5, '9378907': 0.85, '9419311': 3.75
+    };
+
     function safeNum(val) {
       if (typeof val === 'number' && !isNaN(val)) return val;
-      let parsed = parseFloat(val);
+      let parsed = parseFloat(String(val).replace(/,/g, ''));
       return isNaN(parsed) ? 0 : parsed;
+    }
+    
+    function extractMonthYear(rawVal) {
+      let str = String(rawVal || "").trim();
+      if (str.includes('/')) {
+        let parts = str.split('/');
+        if (parts.length >= 3) return { m: parts[1].padStart(2, '0'), y: parts[2].substring(0, 4) };
+      }
+      if (str.includes('-')) {
+        let parts = str.split('T')[0].split('-');
+        if (parts.length >= 3) return { m: parts[1].padStart(2, '0'), y: parts[0] };
+      }
+      return { m: "ไม่ระบุ", y: "ไม่ระบุ" };
     }
 
     function initApp() { fetchDashboardData(); }
@@ -575,23 +604,110 @@
     let globalSheetData = []; 
     let globalDrugTotalTxMap = {}; 
 
-    // 🌟 ดึงข้อมูลจาก Google Sheets (Apps Script) เหมือนเดิม
-    async function fetchDashboardData() {
-      document.getElementById('loading-overlay').classList.add('show');
-      try {
-        const response = await fetch(GAS_URL);
-        if (!response.ok) throw new Error("HTTP Error: " + response.status);
-        const result = await response.json();
-        if(result.status === "success") {
-          globalSheetData = result.data; 
-          globalDrugTotalTxMap = {};
-          globalSheetData.forEach(d => { globalDrugTotalTxMap[d.drug] = (globalDrugTotalTxMap[d.drug] || 0) + 1; });
-          populateFilters(); 
-          renderDashboard();
-          showToast("ซิงค์ฐานข้อมูลสำเร็จ", "success");
-        } else throw new Error(result.message || "Unknown Error");
-      } catch(e) { showToast("ไม่สามารถดึงข้อมูลได้: " + e.message, "error"); }
-      document.getElementById('loading-overlay').classList.remove('show');
+    // 🌟 ระบบดึงข้อมูลแบบใหม่ (Cache-First + ลดขนาด Payload + Progress Animation)
+    async function fetchDashboardData(forceSync = false) {
+      const cachedData = localStorage.getItem('eclaim_cached_data');
+      
+      if (cachedData && !forceSync) {
+        try {
+          // ถ้ามีความจำในเครื่อง ให้แสดงทันที!
+          globalSheetData = JSON.parse(cachedData);
+          updateGlobalMapAndRender("ดึงข้อมูลล่าสุดจากหน่วยความจำเรียบร้อยแล้ว");
+        } catch(e) { console.error(e); localStorage.removeItem('eclaim_cached_data'); }
+      } else {
+        // ถ้าเข้าเว็บครั้งแรก ให้เปิดหน้าจอโหลดแบบมีหลอด Progress
+        const overlay = document.getElementById('loading-overlay');
+        const progress = document.getElementById('loading-progress');
+        const text = document.getElementById('loading-text');
+        overlay.classList.add('show');
+        
+        let p = 0;
+        const progressInterval = setInterval(() => {
+            p += Math.random() * 15;
+            if(p > 90) p = 90;
+            progress.style.width = p + '%';
+            
+            const texts = ["กำลังเชื่อมต่อฐานข้อมูล...", "กำลังตรวจสอบสิทธิการรักษา...", "วิเคราะห์ต้นทุนเวชภัณฑ์...", "ประมวลผลแดชบอร์ด...", "เกือบเสร็จแล้ว..."];
+            text.innerText = texts[Math.floor(p / 20)];
+        }, 600);
+
+        try {
+          const response = await fetch(GAS_URL);
+          if (!response.ok) throw new Error("HTTP Error");
+          const result = await response.json();
+          
+          if (result.status === "success") {
+            const rawRows = result.data; // ได้มาเป็น Array ดิบๆ 
+            globalSheetData = [];
+            
+            // ให้ Browser (JS) เป็นคนประมวลผลแทน (เร็วกว่า GAS 100 เท่า)
+            rawRows.forEach(r => {
+               if(!r || r.length < 15) return;
+               
+               const dateStr = String(r[2] || "").trim();
+               const { m, y } = extractMonthYear(dateStr);
+               
+               const tmt = String(r[5] || "").trim();
+               const fundType = r[17] ? String(r[17]).trim() : "ไม่ระบุ";
+               
+               const req = safeNum(r[10]);
+               const comp = safeNum(r[11]);
+               
+               const unitPrice = safeNum(r[9]) || 1;
+               let qty = safeNum(r[14]);
+               if(qty <= 0) qty = req / unitPrice;
+               
+               const unitCost = DRUG_COSTS[tmt] || 0;
+               const totalCost = qty * unitCost;
+               const profit = comp - totalCost;
+               
+               let cat = "";
+               if (comp <= 0) { cat = "C3"; } else if (comp < req) { cat = "C2"; } else { cat = "C1"; }
+               
+               globalSheetData.push({
+                   date: dateStr, month: m, year: y, pid: String(r[4] || ""), tmt: tmt, 
+                   drug: String(r[6] || ""), fund: fundType, req: req, comp: comp, 
+                   qty: qty, cost: totalCost, profit: profit, cat: cat, reason: String(r[15] || "")
+               });
+            });
+
+            // บันทึกความจำลงเครื่องไว้ใช้ครั้งหน้า
+            try { localStorage.setItem('eclaim_cached_data', JSON.stringify(globalSheetData)); } catch(e) {}
+            
+            clearInterval(progressInterval);
+            progress.style.width = '100%';
+            text.innerText = "ดึงข้อมูลสำเร็จ! กำลังแสดงผล...";
+            
+            setTimeout(() => {
+                updateGlobalMapAndRender("อัปเดตข้อมูลฐานข้อมูลล่าสุดเรียบร้อย!");
+                overlay.classList.remove('show');
+            }, 800);
+            
+          } else throw new Error(result.message);
+        } catch(e) { 
+          clearInterval(progressInterval);
+          overlay.classList.remove('show');
+          if (!cachedData) showToast("ไม่สามารถดึงข้อมูลได้: " + e.message, "error"); 
+        }
+      }
+    }
+
+    function updateGlobalMapAndRender(toastMsg) {
+      globalDrugTotalTxMap = {};
+      globalSheetData.forEach(d => { globalDrugTotalTxMap[d.drug] = (globalDrugTotalTxMap[d.drug] || 0) + 1; });
+      
+      const currentStart = document.getElementById('startPeriod') ? document.getElementById('startPeriod').value : 'ALL';
+      const currentEnd = document.getElementById('endPeriod') ? document.getElementById('endPeriod').value : 'ALL';
+      const currentFund = document.getElementById('fundPeriod') ? document.getElementById('fundPeriod').value : 'ALL';
+
+      populateFilters(); 
+      
+      if(document.getElementById('startPeriod')) document.getElementById('startPeriod').value = currentStart;
+      if(document.getElementById('endPeriod')) document.getElementById('endPeriod').value = currentEnd;
+      if(document.getElementById('fundPeriod')) document.getElementById('fundPeriod').value = currentFund;
+      
+      renderDashboard();
+      if(toastMsg) showToast(toastMsg, "success");
     }
 
     function populateFilters() {
@@ -625,7 +741,6 @@
       drugFilter.innerHTML = drugHtml;
       
       let fundHtml = '<option value="ALL">รวมทุกสิทธิการรักษา</option>';
-      // 🌟 ตัวเลือก รวมสิทธิเบิกตรง
       fundHtml += '<option value="CS_ALL" style="font-weight:bold; color:var(--accent);">📌 รวมสิทธิเบิกตรง (CS/BKK/LGO)</option>';
       Array.from(funds).sort().forEach(f => { fundHtml += `<option value="${f}"> - ${f}</option>`; });
       fundSelect.innerHTML = fundHtml;
@@ -646,7 +761,6 @@
         
         let passFund = true;
         if (fundVal === "CS_ALL") {
-            // ถ้าระบุว่าเอาเบิกตรงทั้งหมด ให้เอา 3 กองทุนนี้มาโชว์รวมกัน
             passFund = (d.fund === "CS (ข้าราชการ/เบิกตรง)" || d.fund === "BKK (กทม.)" || d.fund === "LGO (อปท.)");
         } else if (fundVal !== "ALL") {
             passFund = (d.fund === fundVal);
@@ -666,7 +780,7 @@
       let reasonPrescriptionMap = {}; let reasonTechnicalMap = {};
 
       filtered.forEach(d => {
-        let safeReq = safeNum(d.req); let safeComp = safeNum(d.comp); let safeCost = safeNum(d.cost); let safeProfit = safeNum(d.profit);
+        let safeReq = d.req; let safeComp = d.comp; let safeCost = d.cost; let safeProfit = d.profit;
         drugTxMap[d.drug] = (drugTxMap[d.drug] || 0) + 1;
 
         if(d.cat === 'C1') { 
@@ -750,14 +864,14 @@
       filtered.forEach(d => {
         if(d.year === "ไม่ระบุ" || d.month === "ไม่ระบุ") return;
         const mk = `${d.year}-${d.month}`;
-        let safeComp = safeNum(d.comp); let safeReq = safeNum(d.req);
+        let safeReq = d.req; let safeComp = d.comp;
         if(!trendMap[mk]) trendMap[mk] = { c1_comp: 0, c2_loss_k: 0, c3_req: 0, profit: 0 };
         
         if(safeComp >= safeReq && safeComp > 0) trendMap[mk].c1_comp += safeComp;
         else if(safeComp > 0 && safeComp < safeReq) trendMap[mk].c2_loss_k += (safeReq - safeComp);
         else if(safeComp === 0) trendMap[mk].c3_req += safeReq;
         
-        trendMap[mk].profit += safeNum(d.profit);
+        trendMap[mk].profit += d.profit;
       });
 
       updateCharts({ c1CompTotal: totalCompAll, c2LossTotal: c2_loss_k, c3LossTotal: c3_req, totalNetProfit: totalNetProfit, totalCostAll: totalCostAll, trendMap: trendMap, drugProfitMap: drugProfitMap, drugLossMap: drugLossMap, drugTxMap: drugTxMap });
@@ -1200,12 +1314,11 @@
             const r = arrDrug[i];
             if(r.length < 10) continue;
             
-            // 🌟 ล็อก Index คอลัมน์เงินชดเชยตามชื่อไฟล์ (แก้ Error จากตารางผสานเซลล์)
-            let compColIndex = 19; // Default T (index 19)
+            let compColIndex = 19; 
             if (fn.includes('OPCS_') || fn.includes('OPBKK_') || fn.includes('OPLGO_')) {
-               compColIndex = 18; // S (index 18)
+               compColIndex = 18; 
             } else if (fn.includes('OP_')) {
-               compColIndex = 19; // T (index 19)
+               compColIndex = 19; 
             }
             
             let rawComp = "";
@@ -1234,7 +1347,8 @@
           showToast(`อัปโหลดสำเร็จ! ข้ามไฟล์ซ้ำ ${result.skipped.length} ไฟล์`, "success");
           uploadedFiles = []; document.getElementById('fileList').innerHTML = ''; document.getElementById('fileInput').value = '';
           btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ประมวลผลและอัปโหลด';
-          fetchDashboardData(); 
+          
+          fetchDashboardData(true); 
         } else throw new Error(result.message);
       } catch (err) {
         showToast("ล้มเหลว: " + err.message, "error");
